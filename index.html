@@ -1,1 +1,245 @@
-oii
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AppImage Hub</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f4f4;
+    margin: 0;
+    padding: 20px;
+}
+
+.container { max-width: 1200px; margin: 0 auto; }
+
+h1 { text-align: center; color: #333; }
+
+.app-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 30px 0;
+}
+
+.app-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.app-card:hover { transform: translateY(-4px); }
+
+.app-logo {
+    text-align: center;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.app-logo img {
+    max-width: 100%;
+    max-height: 80px;
+}
+
+.app-name {
+    font-size: 1.4rem;
+    font-weight: bold;
+    text-align: center;
+    margin: 10px 0;
+}
+
+.app-meta {
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.btn-details {
+    display: inline-block;
+    background: #3498db;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+    margin: 4px;
+}
+
+.nav {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.nav a {
+    margin: 0 10px;
+    padding: 10px 15px;
+    background: #2c3e50;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+.detail-view {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+}
+
+.download-buttons {
+    margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>📦 AppImage Hub</h1>
+<div id="content">Carregando...</div>
+</div>
+
+<script>
+
+// COPIAR LINK
+function copiarLink(url) {
+    navigator.clipboard.writeText(url)
+        .then(() => alert("📋 Link copiado!"));
+}
+
+// INSTALAR (LINUX)
+function copiarInstall(url){
+    const cmd = `mkdir -p ~/Applications && cd ~/Applications && FILE=$(basename "${url}") && wget -O "$FILE" "${url}" && chmod +x "$FILE" && ./"$FILE"`;
+
+    navigator.clipboard.writeText(cmd);
+    alert("💻 Comando de instalação copiado!");
+}
+
+// CARREGAR CSV
+async function loadCSV(csvNumber) {
+    try {
+        const res = await fetch(`./dados/${csvNumber}.csv`);
+        if (!res.ok) return null;
+
+        const text = await res.text();
+
+        return text.split('\n').filter(l => l).map((line, i) => {
+            const p = line.split('|');
+            return {
+                nome: p[0],
+                homepage: p[1],
+                downloadUrl: p[2],
+                logo: p[3],
+                licenca: p[4],
+                paginaLicenca: p[5],
+                tamanho: p[6],
+                linha: i + 1,
+                csv: csvNumber
+            };
+        });
+
+    } catch {
+        return null;
+    }
+}
+
+// LISTA
+async function renderList(csv) {
+    const content = document.getElementById('content');
+    const csvNum = parseInt(csv) || 1;
+
+    const apps = await loadCSV(csvNum);
+    if (!apps) return content.innerHTML = "Erro ao carregar.";
+
+    let html = '<div class="app-grid">';
+
+    apps.forEach(app => {
+        html += `
+        <div class="app-card">
+            ${app.logo ? `<div class="app-logo"><img src="${app.logo}"></div>` : ''}
+            <div class="app-name">${app.nome}</div>
+            <div class="app-meta">${app.tamanho} • ${app.licenca}</div>
+            <a href="?csv=${csvNum}&linha=${app.linha}" class="btn-details">Ver detalhes</a>
+        </div>`;
+    });
+
+    html += '</div>';
+
+    // NAVEGAÇÃO
+    html += `
+    <div class="nav">
+        ${csvNum > 1 ? `<a href="?csv=${csvNum - 1}">◀ Anterior</a>` : ''}
+        <a href="?csv=${csvNum + 1}">Próximo ▶</a>
+    </div>
+    `;
+
+    content.innerHTML = html;
+}
+
+// DETALHE
+async function renderDetail(csv, linha) {
+    const content = document.getElementById('content');
+
+    const apps = await loadCSV(csv);
+    const app = apps?.find(a => a.linha == linha);
+
+    if (!app) return content.innerHTML = "Erro.";
+
+    content.innerHTML = `
+    <div class="detail-view">
+
+        ${app.logo ? `<img src="${app.logo}" style="max-width:150px;">` : ''}
+
+        <h2>${app.nome}</h2>
+
+        <p><b>Site:</b> <a href="${app.homepage}" target="_blank">${app.homepage}</a></p>
+        <p><b>Licença:</b> ${app.licenca}</p>
+        <p><b>Tamanho:</b> ${app.tamanho}</p>
+
+        <p><b>Download:</b><br>
+        <a href="${app.downloadUrl}" target="_blank">${app.downloadUrl}</a></p>
+
+        <div class="download-buttons">
+
+            <button onclick="copiarLink(\`${app.downloadUrl}\`)">
+                📋 Copiar link
+            </button>
+
+            <a href="${app.downloadUrl}" download class="btn-details">
+                ⬇ Baixar
+            </a>
+
+            <button onclick="copiarInstall(\`${app.downloadUrl}\`)">
+                ⚙ Instalar
+            </button>
+
+        </div>
+
+        <br>
+        <a href="?csv=${csv}">← Voltar</a>
+
+    </div>`;
+}
+
+// ROUTER
+function router() {
+    const p = new URLSearchParams(location.search);
+    const csv = p.get('csv') || 1;
+    const linha = p.get('linha');
+
+    if (linha) renderDetail(csv, linha);
+    else renderList(csv);
+}
+
+router();
+
+</script>
+
+</body>
+</html>
